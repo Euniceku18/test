@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漢字列車排句小遊戲</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for clean traditional Chinese fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 50%, #eff6ff 100%);
+            user-select: none;
+        }
+        /* Train track animation styling */
+        .railway {
+            background: repeating-linear-gradient(90deg, #374151, #374151 30px, #9ca3af 30px, #9ca3af 45px);
+            height: 12px;
+            border-radius: 6px;
+        }
+        /* Pikachu animation */
+        @keyframes dance {
+            0% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-15px) rotate(-10deg) scale(1.05); }
+            50% { transform: translateY(0) rotate(0deg); }
+            75% { transform: translateY(-15px) rotate(10deg) scale(1.05); }
+            100% { transform: translateY(0) rotate(0deg); }
+        }
+        .animate-pikachu {
+            animation: dance 0.6s infinite ease-in-out;
+        }
+        /* Wobble animation for wrong answer */
+        @keyframes wobble {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-8px) rotate(-3deg); }
+            40% { transform: translateX(8px) rotate(3deg); }
+            60% { transform: translateX(-5px) rotate(-2deg); }
+            80% { transform: translateX(5px) rotate(2deg); }
+            100% { transform: translateX(0); }
+        }
+        .animate-wobble {
+            animation: wobble 0.4s ease-in-out;
+        }
+        /* Pulse glow for correct train */
+        @keyframes successGlow {
+            0% { box-shadow: 0 0 5px #34d399; }
+            50% { box-shadow: 0 0 25px #10b981, 0 0 40px #6ee7b7; }
+            100% { box-shadow: 0 0 5px #34d399; }
+        }
+        .success-glow {
+            animation: successGlow 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-6 text-gray-800">
+
+    <!-- Header / Title -->
+    <header class="w-full max-w-4xl text-center my-2">
+        <div class="inline-block bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl shadow-lg border border-blue-200">
+            <h1 class="text-2xl md:text-3xl font-black text-blue-600 tracking-wider flex items-center justify-center gap-2">
+                <span>🚂</span> 漢字列車排句小遊戲 <span>🌟</span>
+            </h1>
+            <p class="text-sm text-gray-600 mt-1">把詞語卡片排入車廂，組成正確的句子吧！</p>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="w-full max-w-4xl bg-white/90 backdrop-blur-md rounded-3xl shadow-xl p-6 md:p-8 flex flex-col gap-6 border border-white/60 relative overflow-hidden">
+
+        <!-- Progress and Score Bar -->
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-blue-50 p-4 rounded-2xl border border-blue-100">
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-600 text-white font-bold px-4 py-1.5 rounded-full text-sm shadow-sm" id="level-indicator">
+                    第 1 / 5 題
+                </span>
+                <span class="text-gray-700 font-semibold text-sm sm:text-base" id="score-indicator">
+                    得分：<strong class="text-amber-500 text-lg">0</strong> 分
+                </span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="speakSentence()" class="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5 cursor-pointer">
+                    <span>🔊</span> 聽句子
+                </button>
+                <button onclick="showHint()" class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5 cursor-pointer">
+                    <span>💡</span> 提示
+                </button>
+            </div>
+        </div>
+
+        <!-- Train Carriages (Drop Zone for sentence sorting) -->
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between px-2">
+                <span class="text-xs font-bold text-gray-500 tracking-wider uppercase">列車車廂（請將詞語排在這裡）</span>
+                <span id="train-status" class="text-xs font-semibold text-blue-600"></span>
+            </div>
+            <div id="train-container" class="min-h-[110px] bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 flex flex-wrap items-center gap-3 shadow-inner border-4 border-blue-400 relative transition-all duration-300">
+                <!-- Locomotive Engine Head -->
+                <div id="train-engine" class="bg-amber-400 text-amber-900 px-4 py-3 rounded-xl font-black text-lg shadow-md flex items-center gap-2 border-2 border-amber-500 shrink-0">
+                    <span>🚂 火車頭</span>
+                </div>
+                <!-- Carriages slots populated dynamically -->
+                <div id="carriages-slot" class="flex flex-wrap items-center gap-2 flex-grow">
+                    <!-- Dynamic slots / cards will go here -->
+                </div>
+            </div>
+            <!-- Railway Track Graphic -->
+            <div class="w-full px-4 mt-1">
+                <div class="railway w-full"></div>
+            </div>
+        </div>
+
+        <!-- Word Bank (Source Card Pool) -->
+        <div class="flex flex-col gap-2 mt-2">
+            <span class="text-xs font-bold text-gray-500 tracking-wider uppercase">詞語字庫卡片（點擊或拖曳安排順序）</span>
+            <div id="word-bank" class="min-h-[90px] bg-gray-50 rounded-2xl p-4 flex flex-wrap items-center gap-3 border-2 border-dashed border-gray-300">
+                <!-- Word tokens populated dynamically -->
+            </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
+            <button onclick="resetCurrentLevel()" class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 active:scale-95 text-gray-700 font-bold px-6 py-3 rounded-2xl shadow transition cursor-pointer">
+                重新整理本題
+            </button>
+            <button onclick="checkAnswer()" class="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 text-white font-black text-lg px-8 py-3 rounded-2xl shadow-lg transition transform hover:-translate-y-0.5 cursor-pointer">
+                ✨ 檢查答案
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Modal / Victory Screen (Hidden by default) -->
+    <div id="victory-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-8 text-center shadow-2xl border-4 border-amber-300 flex flex-col items-center gap-6 relative overflow-hidden">
+            <!-- Confetti or background sparkles -->
+            <div class="absolute -top-10 -left-10 w-32 h-32 bg-amber-200 rounded-full blur-2xl opacity-50"></div>
+            <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-pink-200 rounded-full blur-2xl opacity-50"></div>
+
+            <!-- Pikachu Dancing Graphic (Pure CSS & Emoji Art) -->
+            <div class="relative z-10 flex flex-col items-center">
+                <div class="text-7xl animate-pikachu mb-2 drop-shadow-md">
+                    ⚡🐭⚡
+                </div>
+                <div class="text-xs font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full shadow-sm">
+                    皮卡丘為你慶祝！
+                </div>
+            </div>
+
+            <div class="relative z-10">
+                <h2 class="text-3xl font-black text-amber-600 mb-2">🎉 恭喜通關！ 🎉</h2>
+                <p class="text-gray-600 text-base">你已經完美答對所有 5 個漢字句子，太厲害囉！</p>
+            </div>
+
+            <div class="bg-blue-50 w-full py-4 rounded-2xl border border-blue-100 relative z-10">
+                <p class="text-sm text-gray-500">最終獲得分數</p>
+                <p id="final-score" class="text-3xl font-black text-blue-600">100 / 100</p>
+            </div>
+
+            <button onclick="restartGame()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-3.5 rounded-2xl shadow-xl text-lg transition active:scale-95 cursor-pointer relative z-10">
+                🔄 再玩一次
+            </button>
+        </div>
+    </div>
+
+    <!-- Feedback Message Box (Custom modal replacement for alert) -->
+    <div id="msg-box" class="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border-2 border-blue-200 flex flex-col gap-4">
+            <div id="msg-icon" class="text-4xl">💡</div>
+            <h3 id="msg-title" class="text-xl font-bold text-gray-800">提示</h3>
+            <p id="msg-content" class="text-gray-600 text-sm leading-relaxed"></p>
+            <button onclick="closeMsgBox()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition cursor-pointer">
+                我知道了
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-gray-500 mt-4">
+        漢字列車小遊戲 &copy; 2026 | 專為學生設計的標準字體趣味學習
+    </footer>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        // Game data definitions based on prompt requirements
+        const levelsData = [
+            {
+                id: 1,
+                segments: ['作夢的雲', '把', '天空', '變得', '更漂亮']
+            },
+            {
+                id: 2,
+                segments: ['我夢見', '自己', '變成', '漂亮的', '黑天鵝']
+            },
+            {
+                id: 3,
+                segments: ['我', '躺在', '像', '棉花糖', '的', '白雲上']
+            },
+            {
+                id: 4,
+                segments: ['小鳥', '也', '飛', '來', '玩']
+            },
+            {
+                id: 5,
+                segments: ['天空', '變得', '更', '好玩了']
+            }
+        ];
+
+        let currentLevelIndex = 0;
+        let score = 0;
+        let userTrainTokens = []; // Tokens placed in train carriages
+        let userBankTokens = [];  // Tokens available in the word bank
+
+        // Initialize game on load
+        window.onload = function() {
+            loadLevel(currentLevelIndex);
+        };
+
+        function loadLevel(index) {
+            currentLevelIndex = index;
+            document.getElementById('level-indicator').innerText = `第 ${index + 1} / ${levelsData.length} 題`;
+            document.getElementById('score-indicator').innerHTML = `得分：<strong class="text-amber-500 text-lg">${score}</strong> 分`;
+            
+            // Reset train glowing state if any
+            const trainContainer = document.getElementById('train-container');
+            trainContainer.classList.remove('success-glow', 'animate-wobble');
+
+            // Prepare tokens
+            const currentSegments = levelsData[index].segments;
+            userTrainTokens = [];
+            // Shuffle tokens for the bank
+            userBankTokens = [...currentSegments].sort(() => Math.random() - 0.5);
+
+            renderGameBoards();
+        }
+
+        function renderGameBoards() {
+            const trainSlot = document.getElementById('carriages-slot');
+            const wordBank = document.getElementById('word-bank');
+
+            // Render Train Carriages
+            trainSlot.innerHTML = '';
+            if (userTrainTokens.length === 0) {
+                trainSlot.innerHTML = `<span class="text-white/70 text-sm italic px-2">請點擊下方詞語卡片放入車廂...</span>`;
+            } else {
+                userTrainTokens.forEach((token, idx) => {
+                    const card = createTokenElement(token, idx, 'train');
+                    trainSlot.appendChild(card);
+                });
+            }
+
+            // Render Word Bank
+            wordBank.innerHTML = '';
+            if (userBankTokens.length === 0) {
+                wordBank.innerHTML = `<span class="text-gray-400 text-sm italic px-2">所有卡片已上車！請檢查答案。</span>`;
+            } else {
+                userBankTokens.forEach((token, idx) => {
+                    const card = createTokenElement(token, idx, 'bank');
+                    wordBank.appendChild(card);
+                });
+            }
+        }
+
+        function createTokenElement(text, index, location) {
+            const btn = document.createElement('button');
+            btn.className = `bg-white hover:bg-blue-50 active:scale-95 text-gray-800 font-bold px-4 py-2.5 rounded-xl shadow-md border-2 border-blue-200 transition-all duration-200 cursor-pointer flex items-center gap-1.5 text-base`;
+            btn.innerHTML = `<span>${text}</span> <span class="text-xs text-gray-400">${location === 'train' ? '❌' : '➕'}</span>`;
+            
+            btn.onclick = function() {
+                if (location === 'bank') {
+                    // Move from bank to train
+                    userBankTokens.splice(index, 1);
+                    userTrainTokens.push(text);
+                } else {
+                    // Move from train back to bank
+                    userTrainTokens.splice(index, 1);
+                    userBankTokens.push(text);
+                }
+                renderGameBoards();
+            };
+
+            return btn;
+        }
+
+        function resetCurrentLevel() {
+            loadLevel(currentLevelIndex);
+        }
+
+        function checkAnswer() {
+            const correctSegments = levelsData[currentLevelIndex].segments;
+            
+            // Check if all tokens are used and match exact order
+            if (userTrainTokens.length !== correctSegments.length) {
+                showMsgBox("尚未排滿", "車廂裡還有卡片沒放完，或是詞語數量不符喔！請檢查看看。", "⏳");
+                return;
+            }
+
+            let isCorrect = true;
+            for (let i = 0; i < correctSegments.length; i++) {
+                if (userTrainTokens[i] !== correctSegments[i]) {
+                    isCorrect = false;
+                    break;
+                }
+            }
+
+            const trainContainer = document.getElementById('train-container');
+
+            if (isCorrect) {
+                score += 20;
+                document.getElementById('score-indicator').innerHTML = `得分：<strong class="text-amber-500 text-lg">${score}</strong> 分`;
+                trainContainer.classList.add('success-glow');
+                playTrainWhistleSound();
+
+                setTimeout(() => {
+                    if (currentLevelIndex < levelsData.length - 1) {
+                        showMsgBox("答對了！🎉", "太棒了！列車順利發車，準備進入下一題！", "🚂");
+                        document.getElementById('msg-box').querySelector('button').onclick = function() {
+                            closeMsgBox();
+                            currentLevelIndex++;
+                            loadLevel(currentLevelIndex);
+                        };
+                    } else {
+                        // All 5 levels completed! Show Pikachu Victory modal
+                        document.getElementById('final-score').innerText = `${score} / 100`;
+                        document.getElementById('victory-modal').classList.remove('hidden');
+                    }
+                }, 400);
+
+            } else {
+                trainContainer.classList.add('animate-wobble');
+                setTimeout(() => trainContainer.classList.remove('animate-wobble'), 500);
+                showMsgBox("順序不對喔！", "這句子的順序好像有點小錯誤，請再試試看把詞語重新排列。加油！", "💪");
+            }
+        }
+
+        function speakSentence() {
+            if (!('speechSynthesis' in window)) {
+                showMsgBox("語音不支援", "您的瀏覽器不支援語音朗讀功能。", "⚠️");
+                return;
+            }
+            window.speechSynthesis.cancel(); // Stop previous speech
+            const fullSentence = levelsData[currentLevelIndex].segments.join('');
+            const utterance = new SpeechSynthesisUtterance(fullSentence);
+            utterance.lang = 'zh-TW';
+            utterance.rate = 0.9; // Slightly slower for students
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function showHint() {
+            const correctSegments = levelsData[currentLevelIndex].segments;
+            const firstWord = correctSegments[0];
+            showMsgBox("提示小幫手", `這句子的第一個詞語是：「<strong class="text-blue-600">${firstWord}</strong>」，試著把它排在第一節車廂吧！`, "💡");
+        }
+
+        function playTrainWhistleSound() {
+            // Web Audio API simple whistle simulation effect
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch (e) {
+                // Ignore if audio context blocked before user gesture
+            }
+        }
+
+        function showMsgBox(title, content, icon = "💡") {
+            document.getElementById('msg-title').innerText = title;
+            document.getElementById('msg-content').innerHTML = content;
+            document.getElementById('msg-icon').innerText = icon;
+            document.getElementById('msg-box').classList.remove('hidden');
+        }
+
+        function closeMsgBox() {
+            document.getElementById('msg-box').classList.add('hidden');
+            // Reset modal button click action to standard close
+            document.getElementById('msg-box').querySelector('button').onclick = closeMsgBox;
+        }
+
+        function restartGame() {
+            document.getElementById('victory-modal').classList.add('hidden');
+            currentLevelIndex = 0;
+            score = 0;
+            loadLevel(currentLevelIndex);
+        }
+    </script>
+</body>
+</html>
